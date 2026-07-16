@@ -1,2 +1,4 @@
 ollama-extension.log
+ollama-extension.out.log
+ollama-extension.err.log
 .DS_Store

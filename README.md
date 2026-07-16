@@ -11,6 +11,74 @@
 - 支持翻译部分图标/图片的 `aria-label`、`title`、`alt` 文本。
 - 选中文本时仍支持弹出翻译浮窗。
 
+## 一键安装
+
+先下载本仓库：
+
+```bash
+git clone https://github.com/even-young-leaf/chrome-zh-translator.git
+cd chrome-zh-translator
+```
+
+如果你不会用 Git，也可以在 GitHub 页面点 `Code` -> `Download ZIP`，解压后在解压目录里运行下面对应系统的脚本。
+
+### macOS
+
+```bash
+chmod +x scripts/install-macos.sh
+./scripts/install-macos.sh
+```
+
+低内存机器可以拉更小的模型：
+
+```bash
+MODEL=gemma3:4b ./scripts/install-macos.sh
+```
+
+### Linux
+
+```bash
+chmod +x scripts/install-linux.sh
+./scripts/install-linux.sh
+```
+
+低内存机器可以拉更小的模型：
+
+```bash
+MODEL=gemma3:4b ./scripts/install-linux.sh
+```
+
+### Windows
+
+在 PowerShell 里进入仓库目录后运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
+低内存机器可以拉更小的模型：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -Model gemma3:4b
+```
+
+### 脚本会做什么
+
+- 如果本机没有 Ollama，会调用 Ollama 官方安装脚本安装。
+- 配置 `OLLAMA_HOST=127.0.0.1:11434`。
+- 配置 `OLLAMA_ORIGINS`，允许本扩展访问本机 Ollama，避免 `Ollama HTTP 403`。
+- 启动 Ollama 服务。
+- 拉取默认模型 `qwen3:8b`，或你指定的 `MODEL` / `-Model`。
+- 尝试打开 `chrome://extensions/`。
+
+Chrome 不允许普通脚本静默安装未打包扩展，所以最后一步仍然需要手动做：
+
+1. 打开 `chrome://extensions/`。
+2. 打开右上角“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择本仓库目录。
+5. 打开英文网页，扩展会自动翻译。
+
 ## 硬件要求
 
 最低可用配置取决于你选择的 Ollama 模型。
@@ -28,22 +96,24 @@
 
 ## 操作系统要求
 
+推荐：
+
+- macOS 14 Sonoma 或更新版本 + Google Chrome / Chromium。
+- Windows 10 或更新版本 + Google Chrome / Edge / Chromium。
+- 常见 Linux 发行版 + Google Chrome / Chromium。
+
 已测试：
 
 - macOS + Google Chrome + Ollama
 
-理论支持：
-
-- Windows + Chrome / Edge / Chromium + Ollama
-- Linux + Chrome / Chromium + Ollama
-
 只要浏览器能访问本机 `http://127.0.0.1:11434` 的 Ollama API，就可以使用。
 
-## 安装 Ollama 和模型
+## 手动安装 Ollama 和模型
 
-先安装 Ollama：
+如果不想用一键脚本，可以手动安装 Ollama：
 
-https://ollama.com/
+- macOS / Linux: https://ollama.com/download
+- Windows: https://ollama.com/download/windows
 
 然后拉取推荐模型：
 
@@ -73,7 +143,7 @@ cplehmmdegoebbhfonddkfeefboonpdb
 
 ### macOS
 
-仓库里提供了启动脚本：
+一键安装脚本已经包含这一步。如果只想重新启动 Ollama，可以运行旧版启动脚本：
 
 ```bash
 ./start-ollama-for-chrome-translator.sh
@@ -102,20 +172,6 @@ OLLAMA_HOST=127.0.0.1:11434 \
 OLLAMA_ORIGINS="chrome-extension://cplehmmdegoebbhfonddkfeefboonpdb,http://127.0.0.1,http://localhost" \
 ollama serve
 ```
-
-## 安装 Chrome 扩展
-
-1. 下载或克隆本仓库。
-2. 打开 Chrome，进入：
-
-```text
-chrome://extensions/
-```
-
-3. 打开右上角“开发者模式”。
-4. 点击“加载已解压的扩展程序”。
-5. 选择本仓库目录。
-6. 打开英文网页，扩展会自动翻译。
 
 ## 配置模型
 

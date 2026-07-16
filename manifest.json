@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "页面中文翻译助手",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "打开后使用本机 Ollama 大模型自动在网页中显示中文翻译。",
   "permissions": [
     "storage",
