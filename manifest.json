@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "页面中文翻译助手",
+  "version": "1.3.0",
+  "description": "打开后使用本机 Ollama 大模型自动在网页中显示中文翻译。",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:11434/*",
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "页面中文翻译助手",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "dictionary.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlYp+8CSvF/5OrP6AAzJucNaNvTztnfgpuIN+ce247DDTcPA8GPPfA4s0VQHB4KSLsBjUlKYwdIcoAXDzhvr9OANDPgY6OvVqgNA16E6g86oKHtgQC0tqOmyUKT1DCy0YSVEydzrnyT2HdInbIU4KlI+Qk7yWPmPp8RQiqcF6bXv+SG6s3JkNWHw6A0MsX0dblhoUCzypIBDaMHWvM5ZTuMskly98T27eLoYw59FwBWjotd4is4JKQF7IMcVg330J8Q3Sc0dyY1hBneiWZTNxjtiys58zTGjGtER5gsqmNYtjhEujdzzuVuhX+6e5SrsHZnI2NFkDiTVitlQw3YG7GwIDAQAB"
+}

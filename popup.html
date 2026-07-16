@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>页面中文翻译助手</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>中文翻译</h1>
+      <label class="row">
+        <span>
+          <strong>开启翻译</strong>
+          <small>当前和后续网页生效</small>
+        </span>
+        <input id="enabled" type="checkbox">
+      </label>
+      <label class="row">
+        <span>
+          <strong>页面内显示</strong>
+          <small>在原文下方插入中文</small>
+        </span>
+        <input id="inlineMode" type="checkbox">
+      </label>
+      <label class="field">
+        <span>Ollama 地址</span>
+        <input id="ollamaUrl" type="text" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>模型</span>
+        <input id="model" type="text" spellcheck="false">
+      </label>
+      <p>开启后会调用本机 Ollama 自动翻译页面正文。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
