@@ -77,6 +77,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -Model ge
 - Linux: 优先写入 `ollama.service` 的 systemd drop-in 配置，然后重启服务。
 - Windows: 写入用户环境变量，重启 Ollama 后继续生效。
 
+macOS 上如果菜单栏里的 Ollama App 也在后台启动了自己的服务，可能会抢占 `localhost:11434` 并导致 403。新版扩展会自动把 `localhost` / `[::1]` 规范化成 `127.0.0.1`，安装脚本也会优先关闭这个额外的后台服务。
+
 Chrome 不允许普通脚本静默安装未打包扩展，所以最后一步仍然需要手动做：
 
 1. 打开 `chrome://extensions/`。
@@ -236,6 +238,8 @@ globalThis.CODEX_ZH_DICTIONARY = {
 ### 出现 `Ollama HTTP 403`
 
 说明 Ollama 拒绝了 Chrome 扩展来源。最常见原因是：电脑重启后，Ollama 被系统自动启动了，但启动时没有带上 `OLLAMA_ORIGINS`。
+
+另一个常见原因是：macOS 菜单栏 Ollama App 启动了自己的 `localhost:11434` 服务，而扩展访问的不是安装脚本创建的 `127.0.0.1:11434` 服务。请升级到 `1.4.2` 或更新版本，新版本会自动规避这个问题。
 
 优先重新运行对应系统的一键安装脚本。
 

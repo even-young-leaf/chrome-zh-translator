@@ -101,6 +101,17 @@ EOF
   fi
 }
 
+stop_macos_app_server() {
+  osascript -e 'tell application "Ollama" to quit' >/dev/null 2>&1 || true
+  pkill -x Ollama 2>/dev/null || true
+
+  local app_server_pids
+  app_server_pids="$(pgrep -f '/Applications/Ollama.app/Contents/Resources/ollama serve' 2>/dev/null || true)"
+  if [[ -n "${app_server_pids}" ]]; then
+    kill ${app_server_pids} 2>/dev/null || true
+  fi
+}
+
 wait_for_ollama() {
   for _ in $(seq 1 40); do
     if curl -fsS "http://${OLLAMA_HOST_VALUE}/api/tags" >/dev/null 2>&1; then
@@ -125,6 +136,9 @@ ensure_model() {
 }
 
 install_ollama
+
+echo "Stopping Ollama.app background server if it is running..."
+stop_macos_app_server
 
 echo "Installing persistent Ollama launcher for this extension..."
 install_launch_agent

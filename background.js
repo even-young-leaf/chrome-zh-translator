@@ -45,10 +45,11 @@ async function translateBatchToChinese(texts) {
 
 chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get(["enabled", "inlineMode", "ollamaUrl", "model"]);
+  const ollamaUrl = normalizeBaseUrl(existing.ollamaUrl || DEFAULT_OLLAMA_URL);
   await chrome.storage.sync.set({
     enabled: existing.enabled ?? true,
     inlineMode: existing.inlineMode ?? true,
-    ollamaUrl: existing.ollamaUrl || DEFAULT_OLLAMA_URL,
+    ollamaUrl,
     model: existing.model || DEFAULT_MODEL
   });
 });
@@ -72,7 +73,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 function normalizeBaseUrl(url) {
-  return String(url).replace(/\/+$/, "");
+  const raw = String(url || DEFAULT_OLLAMA_URL).trim() || DEFAULT_OLLAMA_URL;
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    if (parsed.hostname === "localhost" || parsed.hostname === "::1" || parsed.hostname === "[::1]") {
+      parsed.hostname = "127.0.0.1";
+    }
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return DEFAULT_OLLAMA_URL;
+  }
 }
 
 function parseNumberedTranslations(raw, count) {
