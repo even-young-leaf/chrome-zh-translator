@@ -64,6 +64,23 @@ function Wait-Ollama {
   throw "Ollama did not become ready on http://$OllamaHostValue. Check $LogOutFile and $LogErrFile for details."
 }
 
+function Ensure-Model {
+  $installed = & $OllamaExe list
+  $hasModel = $installed | Select-Object -Skip 1 | ForEach-Object {
+    ($_ -split '\s+')[0]
+  } | Where-Object {
+    $_ -eq $Model
+  }
+
+  if ($hasModel) {
+    Write-Host "Model already installed: $Model"
+    return
+  }
+
+  Write-Host "Pulling model: $Model"
+  & $OllamaExe pull $Model
+}
+
 Install-Ollama
 $OllamaExe = Get-OllamaExe
 
@@ -81,8 +98,7 @@ Write-Host "Starting Ollama for this extension..."
 $serve = Start-Process -FilePath $OllamaExe -ArgumentList "serve" -WindowStyle Hidden -PassThru -RedirectStandardOutput $LogOutFile -RedirectStandardError $LogErrFile
 Wait-Ollama
 
-Write-Host "Pulling model: $Model"
-& $OllamaExe pull $Model
+Ensure-Model
 
 Start-Process "chrome://extensions/" -ErrorAction SilentlyContinue
 

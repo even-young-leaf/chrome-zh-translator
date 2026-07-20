@@ -47,6 +47,16 @@ wait_for_ollama() {
   exit 1
 }
 
+ensure_model() {
+  if ollama list | awk 'NR > 1 { print $1 }' | grep -Fxq "${MODEL}"; then
+    echo "Model already installed: ${MODEL}"
+    return
+  fi
+
+  echo "Pulling model: ${MODEL}"
+  ollama pull "${MODEL}"
+}
+
 configure_systemd() {
   if ! command -v systemctl >/dev/null 2>&1; then
     return 1
@@ -87,8 +97,7 @@ fi
 
 wait_for_ollama
 
-echo "Pulling model: ${MODEL}"
-ollama pull "${MODEL}"
+ensure_model
 
 if command -v xdg-open >/dev/null 2>&1; then
   xdg-open "chrome://extensions/" >/dev/null 2>&1 || true

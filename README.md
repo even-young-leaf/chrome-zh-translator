@@ -67,9 +67,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -Model ge
 - 如果本机没有 Ollama，会调用 Ollama 官方安装脚本安装。
 - 配置 `OLLAMA_HOST=127.0.0.1:11434`。
 - 配置 `OLLAMA_ORIGINS`，允许本扩展访问本机 Ollama，避免 `Ollama HTTP 403`。
-- 启动 Ollama 服务。
+- 启动 Ollama 服务，并尽量做成重启后仍然生效。
 - 拉取默认模型 `qwen3:8b`，或你指定的 `MODEL` / `-Model`。
 - 尝试打开 `chrome://extensions/`。
+
+不同系统的持久化方式：
+
+- macOS: 创建用户级 LaunchAgent，登录后自动用正确的 `OLLAMA_ORIGINS` 启动 Ollama。
+- Linux: 优先写入 `ollama.service` 的 systemd drop-in 配置，然后重启服务。
+- Windows: 写入用户环境变量，重启 Ollama 后继续生效。
 
 Chrome 不允许普通脚本静默安装未打包扩展，所以最后一步仍然需要手动做：
 
@@ -229,10 +235,38 @@ globalThis.CODEX_ZH_DICTIONARY = {
 
 ### 出现 `Ollama HTTP 403`
 
-说明 Ollama 拒绝了 Chrome 扩展来源。请确认启动 Ollama 时设置了：
+说明 Ollama 拒绝了 Chrome 扩展来源。最常见原因是：电脑重启后，Ollama 被系统自动启动了，但启动时没有带上 `OLLAMA_ORIGINS`。
+
+优先重新运行对应系统的一键安装脚本。
+
+macOS:
+
+```bash
+./scripts/install-macos.sh
+```
+
+Linux:
+
+```bash
+./scripts/install-linux.sh
+```
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
+手动排查时，请确认 Ollama 启动时带了：
 
 ```bash
 OLLAMA_ORIGINS="chrome-extension://cplehmmdegoebbhfonddkfeefboonpdb,http://127.0.0.1,http://localhost"
+```
+
+macOS 用户如果仍然遇到 403，可以退出菜单栏里的 Ollama，再运行：
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.evenyoung.chrome-zh-translator.ollama
 ```
 
 ### 出现“无法连接本机 Ollama”
