@@ -102,14 +102,29 @@ const LOCAL_TRANSLATIONS = new Map(Object.entries(globalThis.CODEX_ZH_DICTIONARY
 }));
 
 const TEXT_SELECTOR = [
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
   "header a",
   "header button",
+  "footer a",
+  "footer button",
+  "footer h1",
+  "footer h2",
+  "footer h3",
+  "footer h4",
+  "footer h5",
+  "footer h6",
   "nav a",
   "nav button",
   "button",
   "label",
   "[role='button']",
   "[role='tab']",
+  "[role='heading']",
   "[aria-label]",
   "[role='navigation'] a",
   "[role='navigation'] button",
@@ -167,7 +182,6 @@ const SKIP_SELECTOR = [
   "select",
   "code",
   "pre",
-  "footer",
   "[contenteditable='true']",
   ".codex-zh-translation",
   ".codex-zh-popover"
@@ -249,14 +263,18 @@ function getCandidateBlocks() {
     .filter((node) => isLeafTextCandidate(node))
     .map((node) => ({ node, text: getCandidateText(node) }))
     .filter(({ node, text }) => shouldProcessText(text, node))
+    .sort((a, b) => {
+      const priority = getCandidatePriority(a.node, a.text) - getCandidatePriority(b.node, b.text);
+      if (priority) return priority;
+      return Math.abs(a.node.getBoundingClientRect().top) - Math.abs(b.node.getBoundingClientRect().top);
+    })
     .filter(({ text }) => {
       const key = text.toLowerCase();
       if (seenText.has(key)) return false;
       seenText.add(key);
       return true;
     })
-    .sort((a, b) => Math.abs(a.node.getBoundingClientRect().top) - Math.abs(b.node.getBoundingClientRect().top))
-    .slice(0, 6);
+    .slice(0, 10);
 }
 
 async function translateVisibleBlocks() {
@@ -442,7 +460,9 @@ function cleanText(text) {
 }
 
 function getCandidateText(node) {
-  const visibleText = cleanText(node.innerText || node.textContent || "");
+  const semanticText = cleanText(node.textContent || "");
+  const renderedText = cleanText(node.innerText || semanticText);
+  const visibleText = shouldPreferSemanticText(node, semanticText, renderedText) ? semanticText : renderedText;
   if (!visibleText || node.matches("img,svg")) {
     const accessible = getAccessibleText(node);
     if (accessible) return accessible;
@@ -452,6 +472,13 @@ function getCandidateText(node) {
     if (heading) return cleanText(heading.textContent || "");
   }
   return visibleText;
+}
+
+function shouldPreferSemanticText(node, semanticText, renderedText) {
+  if (!semanticText || !renderedText || semanticText === renderedText) return false;
+  if (!(node instanceof Element)) return false;
+  const textTransform = window.getComputedStyle(node).textTransform;
+  return textTransform && textTransform !== "none";
 }
 
 function getAccessibleText(node) {
@@ -490,6 +517,17 @@ function isPriorityShortTextNode(node, text) {
 
   if (node.matches("a")) return isTitleLikeText(node, text);
   return node.matches("p,li,span,div") && isTitleLikeText(node, text);
+}
+
+function getCandidatePriority(node, text) {
+  if (!(node instanceof Element)) return 9;
+  if (translateLocalText(text)) return 0;
+  if (node.matches("h1,h2,h3,h4,h5,h6,[role='heading']")) return 1;
+  if (node.matches("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return 2;
+  if (node.closest("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return 3;
+  if (node.matches("figcaption")) return 4;
+  if (node.matches("a,button,[role='button'],[role='tab']")) return 5;
+  return 6;
 }
 
 function isTitleLikeText(node, text) {
