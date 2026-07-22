@@ -248,7 +248,7 @@ function getCandidateBlocks() {
     .filter((node) => isVisibleNearViewport(node))
     .filter((node) => isLeafTextCandidate(node))
     .map((node) => ({ node, text: getCandidateText(node) }))
-    .filter(({ text }) => shouldProcessText(text))
+    .filter(({ node, text }) => shouldProcessText(text, node))
     .filter(({ text }) => {
       const key = text.toLowerCase();
       if (seenText.has(key)) return false;
@@ -468,10 +468,39 @@ function shouldTranslate(text) {
   return chineseChars / Math.max(text.length, 1) < 0.08;
 }
 
-function shouldProcessText(text) {
+function shouldProcessText(text, node) {
   if (!text || text.length > 520 || !shouldTranslate(text)) return false;
   if (translateLocalText(text)) return true;
-  return text.length >= 18 && !isLowValueText(text);
+  if (isLowValueText(text)) return false;
+  if (text.length >= 18) return true;
+  return isPriorityShortTextNode(node, text);
+}
+
+function isPriorityShortTextNode(node, text) {
+  if (!(node instanceof Element)) return false;
+  if (text.length < 3 || !/[A-Za-z]/.test(text)) return false;
+  if (/^[A-Z0-9&.+#-]{2,8}$/.test(text)) return false;
+
+  if (node.matches("h1,h2,h3,h4,h5,h6,[role='heading'],figcaption")) return true;
+  if (node.matches("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return true;
+  if (node.closest("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return true;
+
+  const inReadableArea = Boolean(node.closest("article,main,section,[role='article']"));
+  if (!inReadableArea) return false;
+
+  if (node.matches("a")) return isTitleLikeText(node, text);
+  return node.matches("p,li,span,div") && isTitleLikeText(node, text);
+}
+
+function isTitleLikeText(node, text) {
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 6) return false;
+
+  const style = window.getComputedStyle(node);
+  const fontSize = parseFloat(style.fontSize) || 0;
+  const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
+  const rect = node.getBoundingClientRect();
+  return fontSize >= 14 && fontWeight >= 500 && rect.width >= 24 && rect.height >= 12;
 }
 
 function isVisibleNearViewport(node) {
