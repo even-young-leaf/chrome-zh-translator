@@ -98,7 +98,12 @@ const LOCAL_TRANSLATIONS = new Map(Object.entries(globalThis.CODEX_ZH_DICTIONARY
   "templates": "模板",
   "projects": "项目",
   "history": "历史",
-  "favorites": "收藏"
+  "favorites": "收藏",
+  "contact": "联系",
+  "internships": "实习机会",
+  "gallery": "图库",
+  "doge": "政府效率部",
+  "ai.gov": "AI.gov"
 }));
 
 const TEXT_SELECTOR = [
@@ -506,6 +511,7 @@ function shouldProcessText(text, node) {
 function isPriorityShortTextNode(node, text) {
   if (!(node instanceof Element)) return false;
   if (text.length < 3 || !/[A-Za-z]/.test(text)) return false;
+  if (isNavigationTextNode(node)) return true;
   if (/^[A-Z0-9&.+#-]{2,8}$/.test(text)) return false;
 
   if (node.matches("h1,h2,h3,h4,h5,h6,[role='heading'],figcaption")) return true;
@@ -519,6 +525,10 @@ function isPriorityShortTextNode(node, text) {
   return node.matches("p,li,span,div") && isTitleLikeText(node, text);
 }
 
+function isNavigationTextNode(node) {
+  return Boolean(node.closest("header,footer,nav,[role='navigation'],[role='banner'],[role='contentinfo']"));
+}
+
 function getCandidatePriority(node, text) {
   if (!(node instanceof Element)) return 9;
   if (translateLocalText(text)) return 0;
@@ -526,6 +536,7 @@ function getCandidatePriority(node, text) {
   if (node.matches("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return 2;
   if (node.closest("[class*='Headline'],[class*='headline'],[class*='Title'],[class*='title'],[class*='Heading'],[class*='heading']")) return 3;
   if (node.matches("figcaption")) return 4;
+  if (isNavigationTextNode(node)) return 4;
   if (node.matches("a,button,[role='button'],[role='tab']")) return 5;
   return 6;
 }
@@ -567,8 +578,12 @@ function applyLocalVisibleTranslations() {
     .filter((node) => isVisibleNearViewport(node))
     .map((node) => ({ node, text: getCandidateText(node) }))
     .filter(({ text }) => translateLocalText(text))
-    .sort((a, b) => getNodeDepth(b.node) - getNodeDepth(a.node))
-    .slice(0, 40);
+    .sort((a, b) => {
+      const priority = getCandidatePriority(a.node, a.text) - getCandidatePriority(b.node, b.text);
+      if (priority) return priority;
+      return getNodeDepth(b.node) - getNodeDepth(a.node);
+    })
+    .slice(0, 120);
 
   localItems.forEach(({ node, text }) => {
     if (node.closest("[data-codex-zh-local='true']") || node.querySelector("[data-codex-zh-local='true']")) return;
@@ -638,7 +653,8 @@ function applyAccessibleTranslation(node, translation) {
     changed = true;
   }
 
-  if (!changed || cleanText(node.textContent || "")) return changed;
+  if (!changed) return false;
+  if (cleanText(node.textContent || "")) return false;
 
   const label = document.createElement("span");
   label.className = "codex-zh-translation codex-zh-accessible-label";
