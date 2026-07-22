@@ -6,6 +6,9 @@ const STATE = {
   observer: null,
   popover: null,
   translateCache: new Map(),
+  nativeTranslator: null,
+  nativeUnavailable: false,
+  translatorProvider: "auto",
   running: false
 };
 
@@ -173,14 +176,21 @@ const SKIP_SELECTOR = [
 init();
 
 async function init() {
-  const settings = await chrome.storage.sync.get(["enabled", "inlineMode"]);
+  const settings = await chrome.storage.sync.get(["enabled", "inlineMode", "translatorProvider"]);
   STATE.enabled = settings.enabled !== false;
   STATE.inlineMode = settings.inlineMode !== false;
+  STATE.translatorProvider = settings.translatorProvider || "auto";
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
     if (changes.enabled) STATE.enabled = Boolean(changes.enabled.newValue);
     if (changes.inlineMode) STATE.inlineMode = Boolean(changes.inlineMode.newValue);
+    if (changes.translatorProvider) {
+      STATE.translatorProvider = changes.translatorProvider.newValue || "auto";
+      STATE.nativeTranslator?.destroy?.();
+      STATE.nativeTranslator = null;
+      STATE.nativeUnavailable = false;
+    }
     refresh();
   });
 
@@ -350,16 +360,32 @@ async function translateBatch(texts) {
   });
 
   if (uncached.length) {
-    const response = await chrome.runtime.sendMessage({
-      type: "TRANSLATE_BATCH",
-      texts: uncached.map((item) => item.text)
-    });
-
-    if (!response?.ok) {
-      throw new Error(response?.error || "未知错误");
+    let remoteTranslations = [];
+    if (STATE.translatorProvider === "native" || STATE.translatorProvider === "auto") {
+      try {
+        const nativeRequest = translateBatchWithNative(uncached.map((item) => item.text));
+        remoteTranslations = STATE.translatorProvider === "auto"
+          ? await withTimeout(nativeRequest, 900, "Chrome 原生翻译模型未就绪")
+          : await nativeRequest;
+      } catch (error) {
+        if (STATE.translatorProvider === "native") throw error;
+        STATE.nativeUnavailable = true;
+      }
     }
 
-    (response.translations || []).forEach((translation, index) => {
+    if (!remoteTranslations.length) {
+      const response = await chrome.runtime.sendMessage({
+        type: "TRANSLATE_BATCH",
+        texts: uncached.map((item) => item.text)
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error || "未知错误");
+      }
+      remoteTranslations = response.translations || [];
+    }
+
+    remoteTranslations.forEach((translation, index) => {
       STATE.translateCache.set(uncached[index].key, sanitizeTranslation(translation));
     });
   }
@@ -367,18 +393,65 @@ async function translateBatch(texts) {
   return texts.map((text) => STATE.translateCache.get(cacheKey(text)) || "");
 }
 
+async function translateBatchWithNative(texts) {
+  const translator = await getNativeTranslator();
+  const translations = [];
+  for (const text of texts) {
+    translations.push(await translator.translate(text));
+  }
+  return translations;
+}
+
+async function getNativeTranslator() {
+  if (STATE.nativeTranslator) return STATE.nativeTranslator;
+  if (STATE.nativeUnavailable) throw new Error("Chrome 原生翻译 API 当前不可用");
+
+  const root = typeof self !== "undefined" ? self : window;
+  const TranslatorCtor = root.Translator || window.Translator;
+  if (!TranslatorCtor) {
+    STATE.nativeUnavailable = true;
+    throw new Error("Chrome 原生翻译 API 当前不可用");
+  }
+
+  const availability = await TranslatorCtor.availability({
+    sourceLanguage: "en",
+    targetLanguage: "zh"
+  });
+  if (availability !== "available") {
+    STATE.nativeUnavailable = true;
+    throw new Error("Chrome 原生翻译模型未就绪");
+  }
+
+  STATE.nativeTranslator = await TranslatorCtor.create({
+    sourceLanguage: "en",
+    targetLanguage: "zh"
+  });
+  return STATE.nativeTranslator;
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function cleanText(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 
 function getCandidateText(node) {
-  const accessible = getAccessibleText(node);
-  if (accessible) return accessible;
+  const visibleText = cleanText(node.innerText || node.textContent || "");
+  if (!visibleText || node.matches("img,svg")) {
+    const accessible = getAccessibleText(node);
+    if (accessible) return accessible;
+  }
   if (node.matches("a")) {
     const heading = node.querySelector("h1,h2,h3,h4,[class*='Headline'],[class*='Title']");
     if (heading) return cleanText(heading.textContent || "");
   }
-  return cleanText(node.textContent || "");
+  return visibleText;
 }
 
 function getAccessibleText(node) {
@@ -596,7 +669,8 @@ function sanitizeTranslation(text) {
 function formatError(error) {
   const message = error?.message || "未知错误";
   if (message.includes("Failed to fetch")) {
-    return "无法连接本机 Ollama。请确认 Ollama 正在运行，并监听 127.0.0.1:11434。";
+    return "无法连接本机翻译服务。请确认 NMT 服务或 Ollama 正在运行。";
   }
+  if (message.includes("本机 NMT")) return "无法连接本机 NMT 服务，已尝试回退。请确认 start-nmt-service.sh 正在运行。";
   return message;
 }

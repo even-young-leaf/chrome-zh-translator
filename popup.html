@@ -24,6 +24,19 @@
         <input id="inlineMode" type="checkbox">
       </label>
       <label class="field">
+        <span>翻译后端</span>
+        <select id="translatorProvider">
+          <option value="auto">自动</option>
+          <option value="native">Chrome 原生</option>
+          <option value="nmt">本机 NMT</option>
+          <option value="ollama">Ollama</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>NMT 地址</span>
+        <input id="nmtUrl" type="text" spellcheck="false">
+      </label>
+      <label class="field">
         <span>Ollama 地址</span>
         <input id="ollamaUrl" type="text" spellcheck="false">
       </label>
@@ -31,7 +44,7 @@
         <span>模型</span>
         <input id="model" type="text" spellcheck="false">
       </label>
-      <p>开启后会调用本机 Ollama 自动翻译页面正文。</p>
+      <p>开启后优先使用快速翻译后端，失败时回退到本机 Ollama。</p>
     </main>
     <script src="popup.js"></script>
   </body>

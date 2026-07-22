@@ -1,4 +1,7 @@
 ollama-extension.log
 ollama-extension.out.log
 ollama-extension.err.log
+.venv-nmt/
+output/
+__pycache__/
 .DS_Store

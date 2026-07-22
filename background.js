@@ -1,5 +1,7 @@
 const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
+const DEFAULT_NMT_URL = "http://127.0.0.1:11888";
 const DEFAULT_MODEL = "qwen3:8b";
+const DEFAULT_PROVIDER = "auto";
 
 async function translateToChinese(text) {
   const results = await translateBatchToChinese([text]);
@@ -7,9 +9,51 @@ async function translateToChinese(text) {
 }
 
 async function translateBatchToChinese(texts) {
-  const settings = await chrome.storage.sync.get(["ollamaUrl", "model"]);
+  const cleanTexts = texts.map((text) => String(text || "").trim()).filter(Boolean);
+  if (!cleanTexts.length) return [];
+
+  const settings = await chrome.storage.sync.get(["translatorProvider", "nmtUrl", "ollamaUrl", "model"]);
+  const provider = settings.translatorProvider || DEFAULT_PROVIDER;
+  const nmtUrl = normalizeBaseUrl(settings.nmtUrl || DEFAULT_NMT_URL, DEFAULT_NMT_URL);
   const baseUrl = normalizeBaseUrl(settings.ollamaUrl || DEFAULT_OLLAMA_URL);
   const model = settings.model || DEFAULT_MODEL;
+
+  if (provider === "nmt" || provider === "auto") {
+    try {
+      return await translateBatchWithNmt(cleanTexts, nmtUrl);
+    } catch (error) {
+      if (provider === "nmt") throw error;
+      console.warn("NMT translate failed, falling back to Ollama:", error);
+    }
+  }
+
+  return translateBatchWithOllama(cleanTexts, baseUrl, model);
+}
+
+async function translateBatchWithNmt(texts, nmtUrl) {
+  const response = await fetchWithTimeout(`${nmtUrl}/translate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source: "en",
+      target: "zh",
+      texts
+    })
+  }, 8000);
+
+  if (!response.ok) {
+    throw new Error(`本机 NMT HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const translations = Array.isArray(data.translations) ? data.translations : [];
+  if (translations.length !== texts.length) {
+    throw new Error("本机 NMT 返回数量不匹配");
+  }
+  return translations.map((translation) => String(translation || "").trim());
+}
+
+async function translateBatchWithOllama(texts, baseUrl, model) {
   const items = texts.map((text, index) => `[${index + 1}] ${text}`).join("\n\n");
   const prompt = [
     "把下面编号文本逐条翻译成简体中文。",
@@ -18,7 +62,7 @@ async function translateBatchToChinese(texts) {
     items
   ].join("\n");
 
-  const response = await fetch(`${baseUrl}/api/generate`, {
+  const response = await fetchWithTimeout(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -31,7 +75,7 @@ async function translateBatchToChinese(texts) {
         num_predict: Math.min(900, Math.max(220, 110 * texts.length))
       }
     })
-  });
+  }, 60000);
 
   if (!response.ok) {
     throw new Error(`Ollama HTTP ${response.status}`);
@@ -44,11 +88,14 @@ async function translateBatchToChinese(texts) {
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const existing = await chrome.storage.sync.get(["enabled", "inlineMode", "ollamaUrl", "model"]);
-  const ollamaUrl = normalizeBaseUrl(existing.ollamaUrl || DEFAULT_OLLAMA_URL);
+  const existing = await chrome.storage.sync.get(["enabled", "inlineMode", "translatorProvider", "nmtUrl", "ollamaUrl", "model"]);
+  const nmtUrl = normalizeBaseUrl(existing.nmtUrl || DEFAULT_NMT_URL, DEFAULT_NMT_URL);
+  const ollamaUrl = normalizeBaseUrl(existing.ollamaUrl || DEFAULT_OLLAMA_URL, DEFAULT_OLLAMA_URL);
   await chrome.storage.sync.set({
     enabled: existing.enabled ?? true,
     inlineMode: existing.inlineMode ?? true,
+    translatorProvider: existing.translatorProvider || DEFAULT_PROVIDER,
+    nmtUrl,
     ollamaUrl,
     model: existing.model || DEFAULT_MODEL
   });
@@ -72,8 +119,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-function normalizeBaseUrl(url) {
-  const raw = String(url || DEFAULT_OLLAMA_URL).trim() || DEFAULT_OLLAMA_URL;
+function normalizeBaseUrl(url, fallback = DEFAULT_OLLAMA_URL) {
+  const raw = String(url || fallback).trim() || fallback;
   const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
 
   try {
@@ -83,7 +130,17 @@ function normalizeBaseUrl(url) {
     }
     return parsed.toString().replace(/\/+$/, "");
   } catch {
-    return DEFAULT_OLLAMA_URL;
+    return fallback;
+  }
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
